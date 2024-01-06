@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const port = process.env.PORT || 5000;
 const app = express();
@@ -23,10 +24,36 @@ async function run() {
   try {
     await client.connect();
 
+    
+    const verifyToken = (req, res, next) => {
+      console.log("inside verify token", req.headers.authorization);
+
+      if (!req.headers.authorization) {
+        return res.status(401).send({
+          message: "Forbidden Access",
+        });
+      }
+      const token = req.headers.authorization.split(' ')[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "Forbidden Access" });
+        }
+
+        req.decoded = decoded;
+        next();
+      });
+    };
     // const verifyAdmin =
 
     const userCollection = client.db("Gym").collection("Users");
-
+    // JWT related APi
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
     // Users related APi
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -40,7 +67,8 @@ async function run() {
       res.send(result);
     });
     // Show Users From the DB To All User Admin Dashboard
-    app.get("/users", async (req, res) => {
+    app.get("/users",verifyToken, async (req, res) => {
+      console.log(req.headers);
       const result = await userCollection.find().toArray();
       res.send(result);
     });
@@ -49,6 +77,19 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await userCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // Making Admin Or Other Role Update
+    app.patch("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 
