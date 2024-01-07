@@ -24,7 +24,10 @@ async function run() {
   try {
     await client.connect();
 
-    
+    // Database Collection
+    const userCollection = client.db("Gym").collection("Users");
+    const classCollection = client.db("Gym").collection("manageClasses");
+
     const verifyToken = (req, res, next) => {
       console.log("inside verify token", req.headers.authorization);
 
@@ -33,7 +36,7 @@ async function run() {
           message: "Forbidden Access",
         });
       }
-      const token = req.headers.authorization.split(' ')[1];
+      const token = req.headers.authorization.split(" ")[1];
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
         if (err) {
           return res.status(401).send({ message: "Forbidden Access" });
@@ -43,9 +46,30 @@ async function run() {
         next();
       });
     };
-    // const verifyAdmin =
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "Unauthorized access" });
+      }
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.role === "admin";
+      }
+      res.send({ admin });
+    });
 
-    const userCollection = client.db("Gym").collection("Users");
     // JWT related APi
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -54,6 +78,18 @@ async function run() {
       });
       res.send({ token });
     });
+
+    // Class Related Apis
+    app.get("/manageClasses", async (req, res) => {
+      const query = req.body;
+      const result = await classCollection.find(query).toArray();
+      res.send(result);
+    });
+    app.post('/manageClass',async(req,res)=>{
+      const user = req.body;
+      const result = await classCollection.insertOne(user)
+      res.send(result)
+    })
     // Users related APi
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -67,13 +103,13 @@ async function run() {
       res.send(result);
     });
     // Show Users From the DB To All User Admin Dashboard
-    app.get("/users",verifyToken, async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       console.log(req.headers);
       const result = await userCollection.find().toArray();
       res.send(result);
     });
     // Delete Users Data from the DB
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await userCollection.deleteOne(query);
