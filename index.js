@@ -4,9 +4,16 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const port = process.env.PORT || 5000;
 const app = express();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
-app.use(cors());
+app.use(
+  cors()
+  // {
+  //   origin: ["http://localhost:5173"],
+  //   credentials: true,
+  // }
+);
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@try-myself.0cjln25.mongodb.net/?retryWrites=true&w=majority`;
@@ -22,11 +29,12 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
 
     // Database Collection
     const userCollection = client.db("Gym").collection("Users");
     const classCollection = client.db("Gym").collection("manageClasses");
+    const membershipCollection = client.db("Gym").collection("PaidMember");
 
     const verifyToken = (req, res, next) => {
       console.log("inside verify token", req.headers.authorization);
@@ -85,11 +93,11 @@ async function run() {
       const result = await classCollection.find(query).toArray();
       res.send(result);
     });
-    app.post('/manageClass',async(req,res)=>{
+    app.post("/manageClass", async (req, res) => {
       const user = req.body;
-      const result = await classCollection.insertOne(user)
-      res.send(result)
-    })
+      const result = await classCollection.insertOne(user);
+      res.send(result);
+    });
     // Users related APi
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -102,6 +110,13 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
+    // Paid MemberShip User Api
+   app.post('/paidUsers',async(req,res)=>{
+    const paid = req.body;
+    const result = await membershipCollection.insertOne(paid)
+    res.send(result)
+   })
+
     // Show Users From the DB To All User Admin Dashboard
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       console.log(req.headers);
@@ -129,12 +144,29 @@ async function run() {
       res.send(result);
     });
 
+    // Payment Related Api
+
+    app.post("/create-payment-intent", verifyToken, async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount, 'amount Error');
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+    
+
     // User Email verify
 
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
   }
 }
