@@ -35,6 +35,7 @@ async function run() {
     const userCollection = client.db("Gym").collection("Users");
     const classCollection = client.db("Gym").collection("manageClasses");
     const membershipCollection = client.db("Gym").collection("PaidMember");
+    const paymentCollectin = client.db("Gym").collection("paymentCollection");
 
     const verifyToken = (req, res, next) => {
       console.log("inside verify token", req.headers.authorization);
@@ -111,11 +112,11 @@ async function run() {
       res.send(result);
     });
     // Paid MemberShip User Api
-   app.post('/paidUsers',async(req,res)=>{
-    const paid = req.body;
-    const result = await membershipCollection.insertOne(paid)
-    res.send(result)
-   })
+    app.post("/paidUsers", async (req, res) => {
+      const paid = req.body;
+      const result = await membershipCollection.insertOne(paid);
+      res.send(result);
+    });
 
     // Show Users From the DB To All User Admin Dashboard
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
@@ -149,7 +150,7 @@ async function run() {
     app.post("/create-payment-intent", verifyToken, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
-      console.log(amount, 'amount Error');
+      console.log(amount, "amount Error");
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: "usd",
@@ -159,7 +160,18 @@ async function run() {
         clientSecret: paymentIntent.client_secret,
       });
     });
-    
+
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollectin.insertOne(payment);
+      res.send(paymentResult);
+    });
+
+    app.get("/payments", verifyToken, verifyAdmin, async (req, res) => {
+      console.log(req.headers);
+      const result = await paymentCollectin.find().toArray();
+      res.send(result);
+    });
 
     // User Email verify
 
