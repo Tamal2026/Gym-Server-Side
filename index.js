@@ -112,11 +112,7 @@ async function run() {
       res.send(result);
     });
     // Paid MemberShip User Api
-    app.post("/paidUsers", async (req, res) => {
-      const paid = req.body;
-      const result = await membershipCollection.insertOne(paid);
-      res.send(result);
-    });
+   
 
     // Show Users From the DB To All User Admin Dashboard
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
@@ -147,7 +143,7 @@ async function run() {
 
     // Payment Related Api
 
-    app.post("/create-payment-intent", verifyToken, async (req, res) => {
+    app.post("/create-payment-intent",  async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       console.log(amount, "amount Error");
@@ -163,8 +159,14 @@ async function run() {
 
     app.post("/payments", async (req, res) => {
       const payment = req.body;
-      const paymentResult = await paymentCollectin.insertOne(payment);
-      res.send(paymentResult);
+      const query = {email: payment.email}
+      const existingUser = await paymentCollectin.findOne(query);
+      if(existingUser){
+        return res.send({message: "This Email Owner is an member Already"})
+
+      }
+      const result = await paymentCollectin.insertOne(payment)
+      res.send(result);
     });
 
     app.get("/payments", verifyToken, verifyAdmin, async (req, res) => {
@@ -172,6 +174,8 @@ async function run() {
       const result = await paymentCollectin.find().toArray();
       res.send(result);
     });
+
+
 
     // User Email verify
 
